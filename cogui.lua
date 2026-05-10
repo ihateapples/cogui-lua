@@ -97,15 +97,16 @@ function cogui:CreateWindow(title, size)
     window.Main = main
     window.Tabs = {}
 
-    function window:CreateTab(name)
+        function window:CreateTab(name)
         local tab = {}
+        local index = #window.Tabs + 1
 
         local container = Instance.new("ScrollingFrame", main)
         container.Size = UDim2.new(1, -20, 1, -70)
         container.Position = UDim2.new(0, 10, 0, 60)
         container.BackgroundTransparency = 1
         container.ScrollBarThickness = 6
-        container.Visible = #window.Tabs == 0
+        container.Visible = (index == 1)
         container.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
         local left = Instance.new("Frame", container)
@@ -116,6 +117,105 @@ function cogui:CreateWindow(title, size)
         right.Size = UDim2.new(0.48, 0, 1, 0)
         right.Position = UDim2.new(0.52, 0, 0, 0)
         right.BackgroundTransparency = 1
+
+        -- tab switching 
+        local tabButton = Instance.new("TextButton", main)
+        tabButton.Size = UDim2.new(0, 120, 0, 40)
+        tabButton.Position = UDim2.new(0, 15 + (index-1)*125, 0, 8)
+        tabButton.BackgroundColor3 = index == 1 and cogui.theme.accent or Color3.fromRGB(40, 40, 40)
+        tabButton.Text = name
+        tabButton.TextColor3 = Color3.new(1,1,1)
+        tabButton.Font = cogui.theme.font
+        tabButton.TextSize = 14
+        tabButton.BorderSizePixel = 0
+
+        tabButton.MouseButton1Click:Connect(function()
+            -- hide all tabs
+            for _, t in ipairs(window.Tabs) do
+                if t.Container then
+                    t.Container.Visible = false
+                end
+            end
+            container.Visible = true
+
+            -- update button colors
+            for _, btn in ipairs(window.TabButtons or {}) do
+                btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            end
+            tabButton.BackgroundColor3 = cogui.theme.accent
+        end)
+
+        -- store references so they can be controlled
+        tab.Container = container
+        if not window.TabButtons then window.TabButtons = {} end
+        table.insert(window.TabButtons, tabButton)
+        -- ===================================================
+
+        function tab:CreateSector(sectorName, side)
+            local sector = Instance.new("Frame", side == "left" and left or right)
+            sector.BackgroundColor3 = cogui.theme.sector
+            sector.BorderSizePixel = 0
+            sector.AutomaticSize = Enum.AutomaticSize.Y
+            sector.Size = UDim2.new(1, 0, 0, 40)
+
+            local title = Instance.new("TextLabel", sector)
+            title.Size = UDim2.new(1, 0, 0, 26)
+            title.BackgroundTransparency = 1
+            title.Text = "  " .. sectorName
+            title.TextColor3 = cogui.theme.accent
+            title.Font = cogui.theme.font
+            title.TextSize = 15
+            title.TextXAlignment = Enum.TextXAlignment.Left
+
+            local content = Instance.new("Frame", sector)
+            content.Position = UDim2.new(0, 8, 0, 28)
+            content.Size = UDim2.new(1, -16, 0, 0)
+            content.BackgroundTransparency = 1
+            content.AutomaticSize = Enum.AutomaticSize.Y
+
+            local layout = Instance.new("UIListLayout", content)
+            layout.Padding = UDim.new(0, 6)
+            layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+            local sectorAPI = {}
+
+            function sectorAPI:AddButton(text, callback)
+                local btn = Instance.new("TextButton", content)
+                btn.Size = UDim2.new(1, 0, 0, 34)
+                btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                btn.Text = text
+                btn.TextColor3 = cogui.theme.text
+                btn.Font = cogui.theme.font
+                btn.TextSize = cogui.theme.fontsize
+                btn.MouseButton1Click:Connect(callback or function() end)
+                return btn
+            end
+
+            function sectorAPI:AddToggle(text, default, callback)
+                local toggle = Instance.new("TextButton", content)
+                toggle.Size = UDim2.new(1, 0, 0, 34)
+                toggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                toggle.Text = "  " .. text
+                toggle.TextColor3 = default and cogui.theme.accent or cogui.theme.text
+                toggle.TextXAlignment = Enum.TextXAlignment.Left
+                toggle.Font = cogui.theme.font
+                toggle.TextSize = cogui.theme.fontsize
+
+                local state = default or false
+                toggle.MouseButton1Click:Connect(function()
+                    state = not state
+                    toggle.TextColor3 = state and cogui.theme.accent or cogui.theme.text
+                    if callback then callback(state) end
+                end)
+                return toggle
+            end
+
+            return sectorAPI
+        end
+
+        table.insert(window.Tabs, tab)
+        return tab
+    end
 
         function tab:CreateSector(sectorName, side)
             local sector = Instance.new("Frame", side == "left" and left or right)
