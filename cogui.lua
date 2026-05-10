@@ -45,7 +45,7 @@ function cogui:CreateWindow(title, size)
     main.BackgroundColor3 = cogui.theme.background
     main.BorderSizePixel = 0
 
-    -- outlines
+    -- outer outlines for a nicer look
     for i = 1, 2 do
         local outline = Instance.new("Frame", main)
         local thick = i == 1 and 2 or 4
@@ -56,7 +56,7 @@ function cogui:CreateWindow(title, size)
         outline.ZIndex = -i
     end
 
-    -- top bar
+    -- top bar with title and dragging support
     local topbar = Instance.new("Frame", main)
     topbar.Size = UDim2.new(1, 0, 0, 50)
     topbar.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
@@ -72,7 +72,7 @@ function cogui:CreateWindow(title, size)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Position = UDim2.new(0, 15, 0, 0)
 
-    -- dragging
+    -- window dragging logic
     local dragging = false
     topbar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -106,6 +106,7 @@ function cogui:CreateWindow(title, size)
         container.BackgroundTransparency = 1
         container.ScrollBarThickness = 6
         container.Visible = #window.Tabs == 0
+        container.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
         local left = Instance.new("Frame", container)
         left.Size = UDim2.new(0.48, 0, 1, 0)
@@ -144,6 +145,7 @@ function cogui:CreateWindow(title, size)
 
             local sectorAPI = {}
 
+            -- button that runs a function when clicked
             function sectorAPI:AddButton(text, callback)
                 local btn = Instance.new("TextButton", content)
                 btn.Size = UDim2.new(1, 0, 0, 34)
@@ -156,25 +158,129 @@ function cogui:CreateWindow(title, size)
                 return btn
             end
 
+            -- toggle (on/off switch)
             function sectorAPI:AddToggle(text, default, callback)
                 local toggle = Instance.new("TextButton", content)
                 toggle.Size = UDim2.new(1, 0, 0, 34)
                 toggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
                 toggle.Text = "  " .. text
-                toggle.TextColor3 = cogui.theme.text
+                toggle.TextColor3 = default and cogui.theme.accent or cogui.theme.text
                 toggle.TextXAlignment = Enum.TextXAlignment.Left
                 toggle.Font = cogui.theme.font
                 toggle.TextSize = cogui.theme.fontsize
 
                 local state = default or false
-
                 toggle.MouseButton1Click:Connect(function()
                     state = not state
                     toggle.TextColor3 = state and cogui.theme.accent or cogui.theme.text
                     if callback then callback(state) end
                 end)
-
                 return toggle
+            end
+
+            -- slider for numbers (walkspeed, cframe speed, etc.)
+            function sectorAPI:AddSlider(text, min, max, default, callback)
+                local frame = Instance.new("Frame", content)
+                frame.Size = UDim2.new(1, 0, 0, 52)
+                frame.BackgroundTransparency = 1
+
+                local label = Instance.new("TextLabel", frame)
+                label.Size = UDim2.new(1, 0, 0, 20)
+                label.BackgroundTransparency = 1
+                label.Text = text .. ": <font color='rgb(80,180,255)'>" .. default .. "</font>"
+                label.TextColor3 = cogui.theme.text
+                label.Font = cogui.theme.font
+                label.TextSize = 14
+                label.RichText = true
+                label.TextXAlignment = Enum.TextXAlignment.Left
+
+                local bar = Instance.new("Frame", frame)
+                bar.Size = UDim2.new(1, 0, 0, 16)
+                bar.Position = UDim2.new(0, 0, 0, 28)
+                bar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+                bar.BorderSizePixel = 0
+
+                local fill = Instance.new("Frame", bar)
+                fill.Size = UDim2.new(0, 0, 1, 0)
+                fill.BackgroundColor3 = cogui.theme.accent
+                fill.BorderSizePixel = 0
+
+                local value = default or min
+
+                local function update(pos)
+                    local percent = math.clamp((pos - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+                    value = math.floor(min + (max - min) * percent)
+                    fill.Size = UDim2.new(percent, 0, 1, 0)
+                    label.Text = text .. ": <font color='rgb(80,180,255)'>" .. value .. "</font>"
+                    if callback then callback(value) end
+                end
+
+                bar.InputBegan:Connect(function(inp)
+                    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                        update(inp.Position.X)
+                        local conn = services.uis.InputChanged:Connect(function(i)
+                            if i.UserInputType == Enum.UserInputType.MouseMovement then
+                                update(i.Position.X)
+                            end
+                        end)
+                        services.uis.InputEnded:Connect(function(i)
+                            if i.UserInputType == Enum.UserInputType.MouseButton1 then conn:Disconnect() end
+                        end)
+                    end
+                end)
+
+                return {Value = value}
+            end
+
+            -- textbox for typing strings (usernames, values, etc.)
+            function sectorAPI:AddTextbox(placeholder, default, callback)
+                local box = Instance.new("TextBox", content)
+                box.Size = UDim2.new(1, 0, 0, 34)
+                box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                box.PlaceholderText = placeholder or ""
+                box.Text = default or ""
+                box.TextColor3 = cogui.theme.text
+                box.Font = cogui.theme.font
+                box.TextSize = cogui.theme.fontsize
+                box.ClearTextOnFocus = false
+                box.BorderSizePixel = 0
+
+                box.FocusLost:Connect(function()
+                    if callback then callback(box.Text) end
+                end)
+
+                return box
+            end
+
+            -- keybind (lets user press a key to change the bind)
+            function sectorAPI:AddKeybind(text, default, callback)
+                local key = default or Enum.KeyCode.E
+                local btn = Instance.new("TextButton", content)
+                btn.Size = UDim2.new(1, 0, 0, 34)
+                btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                btn.Text = text .. ": " .. key.Name
+                btn.TextColor3 = cogui.theme.text
+                btn.Font = cogui.theme.font
+                btn.TextSize = cogui.theme.fontsize
+                btn.TextXAlignment = Enum.TextXAlignment.Left
+
+                local listening = false
+
+                btn.MouseButton1Click:Connect(function()
+                    listening = true
+                    btn.Text = text .. ": ..."
+                end)
+
+                services.uis.InputBegan:Connect(function(input)
+                    if listening and input.UserInputType == Enum.UserInputType.Keyboard then
+                        key = input.KeyCode
+                        btn.Text = text .. ": " .. key.Name
+                        listening = false
+                        if callback then callback(key) end
+                    end
+                end)
+
+                return btn
             end
 
             return sectorAPI
